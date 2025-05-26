@@ -1,7 +1,8 @@
 # OSX
 #
 .DS_Store
-
+./android/app/my-aiva-app-upload-key.keystore
+.env
 # Xcode
 #
 build/

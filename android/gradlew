@@ -249,3 +249,13 @@ eval "set -- $(
     )" '"$@"'
 
 exec "$JAVACMD" "$@"
+# android/gradle.properties
+
+# Keystore properties for signing your release APK
+# DO NOT commit this file to version control if it contains sensitive passwords.
+# Ensure it's listed in your project's .gitignore (e.g., *.properties or android/gradle.properties)
+
+MYAPP_UPLOAD_STORE_FILE=my-aiva-app-upload-key.keystore
+MYAPP_UPLOAD_KEY_ALIAS=aiva_app_key_alias
+MYAPP_UPLOAD_STORE_PASSWORD=MySecureStorePass123!
+MYAPP_UPLOAD_KEY_PASSWORD=MySecureKeyPass456#

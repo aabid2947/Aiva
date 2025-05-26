@@ -15,6 +15,10 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+  
+           classpath 'com.google.gms:google-services:4.4.1' // Use the latest version
+        // For React Native 0.70+ with Hermes, you might also need this if building manually
+        classpath("com.facebook.react:react-native-gradle-plugin")
     }
 }
 
