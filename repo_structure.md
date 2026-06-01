@@ -45,6 +45,7 @@ app/
     │   │   └── time_format.dart      ✅ relativeTime(DateTime) — "just now / 5m ago / 3d ago / date" (chat + drawer)
     │   └── widgets/             ✅ Reusable presentational widgets
     │       ├── app_toast.dart        ✅ AppToast — semantic toasts (success/error/warning/info) as themed floating SnackBars; context + *Global variants (push/deep-link). ALL transient feedback goes through this
+    │       ├── aiva_wordmark.dart    ✅ AivaWordmark — "AIVA" as real text (Plus Jakarta Sans w800, brand blue) replacing the old aiva_text.png; scales crisply (login/splash/chat appbar/drawer)
     │       ├── branded_splash.dart   ✅ BrandedSplash — pulsing logo loading screen for AuthStatus.unknown
     │       ├── gradient_background.dart ✅ (P3) themed gradient + blurred brand blobs backdrop (auth screens)
     │       ├── app_card.dart         ✅ (P6) AppCard — surface + hairline border + rounded, optional tap
@@ -71,6 +72,7 @@ app/
     │   ├── appointment_service.dart ✅ GET /appointments (list) + PUT /appointments/{id} (edit) + DELETE /appointments/{id} (cancel pending)
     │   ├── reminder_service.dart    ✅ GET /reminders (list) + PUT /reminders/{id} (edit content/time, UTC) + DELETE /reminders/{id} (cancel)
     │   ├── notification_service.dart ✅ GET /notifications (feed + unread) + mark-read / mark-all-read / delete (NotificationFeed)
+    │   ├── voice_service.dart   ✅ Voice chat: device speech-to-text (mic→text, partial+final) + flutter_tts (speak AIVA's reply); on-device, no API/key
     │   ├── call_service.dart    ✅ WebRTC client to VoiceStream: ICE → getUserMedia(audio) → /api/offer?request_id → answer; mute/speaker
     │   └── call_kit_service.dart ✅ Native incoming-call UI (flutter_callkit_incoming): ringtone+vibrate+full-screen even when killed/locked; listen() routes accept→CallScreen(autoConnect), decline/end→clear; handleColdStart() for lock-screen-accept relaunch
     └── features/

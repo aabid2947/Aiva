@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/motion/page_transitions.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/aiva_wordmark.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/gradient_background.dart';
 import 'auth_state.dart';
@@ -87,13 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               semanticLabel: 'AIVA logo',
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            Center(
-                              child: Image.asset(
-                                'assets/images/aiva_text.png',
-                                height: 52,
-                                semanticLabel: 'AIVA',
-                              ),
-                            ),
+                            const Center(child: AivaWordmark(fontSize: 38)),
                             const SizedBox(height: AppSpacing.xl),
                             AnimatedSwitcher(
                               duration: AppMotion.base,

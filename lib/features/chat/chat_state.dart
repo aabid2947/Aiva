@@ -64,15 +64,18 @@ class ChatState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> sendMessage(String rawContent) async {
+  /// Sends a message and returns AIVA's reply text (or null on error/empty),
+  /// so a voice-initiated send can speak the response.
+  Future<String?> sendMessage(String rawContent) async {
     final content = rawContent.trim();
-    if (content.isEmpty || _sending) return;
+    if (content.isEmpty || _sending) return null;
 
     _sending = true;
     _error = null;
     _messages = [..._messages, Message.local(role: 'user', content: content)];
     notifyListeners();
 
+    String? reply;
     try {
       _currentChat ??= await _createChatAndTrack();
       final result = await _service.sendMessage(_currentChat!.id, content);
@@ -80,6 +83,7 @@ class ChatState extends ChangeNotifier {
         ..removeLast() // drop optimistic user bubble
         ..add(result.userMessage)
         ..add(result.assistantMessage);
+      reply = result.assistantMessage.content;
       await _refreshChatsQuietly();
       _syncCurrentChat(); // pick up the server-assigned title (P12)
     } on DioException catch (e) {
@@ -89,6 +93,7 @@ class ChatState extends ChangeNotifier {
 
     _sending = false;
     notifyListeners();
+    return reply;
   }
 
   Future<void> attachAndSummarize(Uint8List bytes, String filename) async {

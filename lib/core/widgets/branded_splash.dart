@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_spacing.dart';
+import 'aiva_wordmark.dart';
 
 /// Branded loading screen shown while the app figures out auth state. The logo
 /// breathes (subtle scale + opacity pulse) instead of a bare spinner. Pulse is
@@ -54,7 +55,7 @@ class _BrandedSplashState extends State<BrandedSplash>
                 ),
               ),
             const SizedBox(height: AppSpacing.xl),
-            Image.asset('assets/images/aiva_text.png', height: 40),
+            const AivaWordmark(fontSize: 30),
           ],
         ),
       ),

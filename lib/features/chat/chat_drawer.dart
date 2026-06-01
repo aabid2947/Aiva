@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/util/time_format.dart';
+import '../../core/widgets/aiva_wordmark.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../models/chat.dart';
 import '../appointments/appointments_screen.dart';
@@ -99,8 +100,7 @@ class _ChatDrawerState extends State<ChatDrawer>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Image.asset('assets/images/aiva_text.png',
-                              height: 20, alignment: Alignment.centerLeft),
+                          const AivaWordmark(fontSize: 18),
                           const SizedBox(height: 2),
                           Text(
                             auth.user?.email ?? '',

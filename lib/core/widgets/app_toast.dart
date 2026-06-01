@@ -61,6 +61,17 @@ abstract final class AppToast {
     final isDark = theme?.brightness == Brightness.dark;
     final scheme = theme?.colorScheme;
 
+    // Anchor the floating toast near the TOP of the screen so it never covers the
+    // chat composer at the bottom. A floating SnackBar is positioned by its bottom
+    // margin, so we push that up to ~just below the status bar.
+    final mq = themeContext != null ? MediaQuery.maybeOf(themeContext) : null;
+    const approxToastHeight = 76.0;
+    final double bottomMargin = mq != null
+        ? (mq.size.height - mq.padding.top - AppSpacing.sm - approxToastHeight)
+            .clamp(AppSpacing.lg, mq.size.height)
+            .toDouble()
+        : AppSpacing.lg;
+
     final accent = switch (kind) {
       _ToastKind.success => AppColors.success,
       _ToastKind.error => scheme?.error ?? AppColors.danger,
@@ -91,8 +102,8 @@ abstract final class AppToast {
       duration: kind == _ToastKind.error
           ? const Duration(seconds: 5)
           : const Duration(milliseconds: 3200),
-      margin: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg),
+      margin: EdgeInsets.fromLTRB(
+          AppSpacing.lg, 0, AppSpacing.lg, bottomMargin),
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       shape: RoundedRectangleBorder(

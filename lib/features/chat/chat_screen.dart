@@ -8,8 +8,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/util/time_format.dart';
+import '../../core/widgets/aiva_wordmark.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/message.dart';
+import '../../services/voice_service.dart';
 import '../mail/mail_connect_state.dart';
 import '../notifications/notification_bell.dart';
 import 'chat_drawer.dart';
@@ -27,6 +29,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   final _drawerOpenTick = ValueNotifier<int>(0);
+  final _voice = VoiceService();
   bool _showJump = false;
   bool _bannerDismissed = false;
 
@@ -43,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.dispose();
     _focusNode.dispose();
     _drawerOpenTick.dispose();
+    _voice.dispose();
     super.dispose();
   }
 
@@ -63,6 +67,18 @@ class _ChatScreenState extends State<ChatScreen> {
     HapticFeedback.lightImpact();
     _controller.clear();
     context.read<ChatState>().sendMessage(text);
+  }
+
+  /// Voice-initiated send: same as _send, but speaks AIVA's reply back.
+  Future<void> _sendVoice() async {
+    final text = _controller.text;
+    if (text.trim().isEmpty) return;
+    HapticFeedback.lightImpact();
+    _controller.clear();
+    final reply = await context.read<ChatState>().sendMessage(text);
+    if (mounted && reply != null && reply.isNotEmpty) {
+      await _voice.speak(reply);
+    }
   }
 
   void _prefill(String text) {
@@ -92,7 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: chat.currentChat != null
             ? Text(chat.currentChat!.displayTitle,
                 maxLines: 1, overflow: TextOverflow.ellipsis)
-            : Image.asset('assets/images/aiva_text.png', height: 22),
+            : const AivaWordmark(fontSize: 20),
         actions: const [NotificationBell()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -142,7 +158,9 @@ class _ChatScreenState extends State<ChatScreen> {
             controller: _controller,
             focusNode: _focusNode,
             onSend: _send,
+            onSendVoice: _sendVoice,
             onAttach: _attach,
+            voice: _voice,
             busy: chat.busy,
             uploading: chat.uploading,
           ),
@@ -634,7 +652,9 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.focusNode,
     required this.onSend,
+    required this.onSendVoice,
     required this.onAttach,
+    required this.voice,
     required this.busy,
     required this.uploading,
   });
@@ -642,7 +662,9 @@ class _Composer extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onSend;
+  final VoidCallback onSendVoice;
   final VoidCallback onAttach;
+  final VoiceService voice;
   final bool busy;
   final bool uploading;
 
@@ -652,6 +674,7 @@ class _Composer extends StatefulWidget {
 
 class _ComposerState extends State<_Composer> {
   bool _hasText = false;
+  bool _listening = false;
 
   @override
   void initState() {
@@ -662,12 +685,63 @@ class _ComposerState extends State<_Composer> {
   @override
   void dispose() {
     widget.controller.removeListener(_onChanged);
+    if (_listening) widget.voice.stopListening();
     super.dispose();
   }
 
   void _onChanged() {
     final has = widget.controller.text.trim().isNotEmpty;
     if (has != _hasText) setState(() => _hasText = has);
+  }
+
+  // ----- voice input -----
+  void _onMicPressed() {
+    if (_listening) {
+      _endMic(send: true); // tap again = stop & send what was heard
+    } else {
+      _startMic();
+    }
+  }
+
+  Future<void> _startMic() async {
+    widget.voice.onStatus = (status) {
+      // The recognizer stopped on its own (silence) → send what we have.
+      if (mounted && (status == 'notListening' || status == 'done')) {
+        _endMic(send: true);
+      }
+    };
+    widget.voice.onError = (_) {
+      if (!mounted) return;
+      _endMic(send: false);
+      AppToast.warning(context, "Didn't catch that — try again.");
+    };
+
+    final ok = await widget.voice.startListening(
+      onResult: (text, isFinal) {
+        if (!mounted) return;
+        widget.controller
+          ..text = text
+          ..selection = TextSelection.collapsed(offset: text.length);
+        if (isFinal) _endMic(send: true);
+      },
+    );
+    if (!mounted) return;
+    if (!ok) {
+      AppToast.error(context, 'Microphone not available. Enable the mic permission.');
+      return;
+    }
+    HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus(); // hide the keyboard while talking
+    setState(() => _listening = true);
+  }
+
+  void _endMic({required bool send}) {
+    if (!_listening) return; // guard against double-fire (final result + status)
+    setState(() => _listening = false);
+    widget.voice.stopListening();
+    if (send && widget.controller.text.trim().isNotEmpty) {
+      widget.onSendVoice();
+    }
   }
 
   @override
@@ -711,15 +785,24 @@ class _ComposerState extends State<_Composer> {
                       maxLines: 5,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
-                      decoration: const InputDecoration(
-                        hintText: 'Message AIVA…',
+                      decoration: InputDecoration(
+                        hintText: _listening ? 'Listening…' : 'Message AIVA…',
                         filled: false,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         contentPadding:
-                            EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            const EdgeInsets.symmetric(vertical: AppSpacing.md),
                       ),
+                    ),
+                  ),
+                  // Voice input: tap to speak, tap again (or pause) to send.
+                  IconButton(
+                    tooltip: _listening ? 'Stop' : 'Speak',
+                    onPressed: (widget.busy && !_listening) ? null : _onMicPressed,
+                    icon: Icon(
+                      _listening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                      color: _listening ? theme.colorScheme.error : null,
                     ),
                   ),
                   Padding(
