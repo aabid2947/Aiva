@@ -72,8 +72,12 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Fire-and-forget FCM registration once the user is authenticated.
-  void _afterLogin() => unawaited(_push.initAndRegister());
+  /// Fire-and-forget once the user is authenticated: register for push and
+  /// report the device timezone so server-side times are user-local.
+  void _afterLogin() {
+    unawaited(_push.initAndRegister());
+    unawaited(_auth.reportTimezone());
+  }
 
   Future<bool> _run(Future<void> Function() action) async {
     _setLoading(true);

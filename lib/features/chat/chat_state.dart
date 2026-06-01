@@ -81,6 +81,7 @@ class ChatState extends ChangeNotifier {
         ..add(result.userMessage)
         ..add(result.assistantMessage);
       await _refreshChatsQuietly();
+      _syncCurrentChat(); // pick up the server-assigned title (P12)
     } on DioException catch (e) {
       _error = _messageFrom(e);
       _messages = [..._messages]..removeLast(); // roll back optimistic bubble
@@ -116,19 +117,52 @@ class ChatState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Show an AIVA confirmation bubble after Gmail is connected (via the OAuth
+  /// deep link). Local/ephemeral — the real handler already greets on next reply.
+  void announceGmailConnected() {
+    _messages = [
+      ..._messages,
+      Message.local(
+        role: 'assistant',
+        content: 'Gmail connected ✅\n'
+            "You'll now get a notification whenever an important email arrives.",
+      ),
+    ];
+    notifyListeners();
+  }
+
   Future<Chat> _createChatAndTrack() async {
     final chat = await _service.createChat();
     _chats = [chat, ..._chats];
     return chat;
   }
 
-  /// After an upload that may have created a chat, point at it.
+  /// After an upload that may have created a chat, point at it (the refreshed
+  /// list entry carries the server-assigned title).
   void _adoptChat(String chatId) {
-    if (_currentChat?.id == chatId) return;
     _currentChat = _chats.firstWhere(
       (c) => c.id == chatId,
-      orElse: () => Chat(id: chatId),
+      orElse: () => _currentChat ?? Chat(id: chatId),
     );
+  }
+
+  /// Re-point the open chat to its refreshed list entry so its title (auto-set
+  /// by the backend from the first message) shows in the app bar. (P12)
+  void _syncCurrentChat() {
+    final id = _currentChat?.id;
+    if (id == null) return;
+    for (final c in _chats) {
+      if (c.id == id) {
+        _currentChat = c;
+        return;
+      }
+    }
+  }
+
+  void clearError() {
+    if (_error == null) return;
+    _error = null;
+    notifyListeners();
   }
 
   Future<void> _refreshChatsQuietly() async {
@@ -140,14 +174,19 @@ class ChatState extends ChangeNotifier {
   }
 
   String _messageFrom(DioException e) {
+    if (e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      return 'Cannot reach the server. Check your connection and try again.';
+    }
+    final status = e.response?.statusCode;
+    if (status != null && status >= 500) {
+      return 'Something went wrong on our end. Please try again in a moment.';
+    }
     final data = e.response?.data;
     if (data is Map && data['detail'] is String) {
       return data['detail'] as String;
     }
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout) {
-      return 'Cannot reach the server. Is the backend running?';
-    }
-    return 'Request failed (${e.response?.statusCode ?? 'network'}).';
+    return 'Something went wrong. Please try again.';
   }
 }

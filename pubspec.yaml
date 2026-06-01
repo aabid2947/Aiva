@@ -37,10 +37,16 @@ dependencies:
   dio: ^5.9.2
   flutter_secure_storage: ^10.3.1
   provider: ^6.1.5+1
-  file_picker: 11.0.0
+  file_picker: ^11.0.2
   firebase_core: ^4.9.0
   firebase_messaging: ^16.2.2
   url_launcher: ^6.3.2
+  flutter_webrtc: ^0.12.5     # in-app voice call (WebRTC) to the VoiceStream proxy caller
+  flutter_callkit_incoming: ^2.0.4+2  # native full-screen incoming-call UI + ringtone/vibrate (rings even when app is killed/locked)
+  app_links: ^6.3.2           # deep links: OAuth browser → back into the app (aiva://mail-connected)
+  flutter_timezone: ^4.1.1    # device IANA timezone → backend (so reminder/appointment times are user-local)
+  google_fonts: ^6.2.1        # centralized typography (Plus Jakarta Sans headings + Inter body)
+  animations: ^2.0.11         # Material motion (fade-through / shared-axis) for page transitions
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +69,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

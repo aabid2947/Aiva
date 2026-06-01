@@ -3,7 +3,22 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_keys.dart';
+import '../core/widgets/app_toast.dart';
+import '../features/notifications/notification_routing.dart';
 import 'api_client.dart';
+import 'call_kit_service.dart';
+
+/// Top-level FCM background handler. Non-call notifications carry a notification
+/// payload, so the OS shows them in the tray while backgrounded/terminated.
+/// `incoming_call` pushes arrive DATA-ONLY + high priority so this handler runs
+/// even when the app is killed/locked and can raise the native full-screen
+/// ringing UI via CallKit. FCM requires a registered background handler.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (message.data['type'] == 'incoming_call') {
+    await showIncomingCall(message.data);
+  }
+}
 
 /// Firebase Cloud Messaging integration.
 ///
@@ -19,31 +34,74 @@ class PushService {
 
   Future<void> initAndRegister() async {
     if (_initialized) {
-      if (_token != null) await _registerToken(_token!);
+      // Already wired up. If we never got a token (e.g. FCM SERVICE_NOT_AVAILABLE
+      // on a previous attempt), try again now; otherwise just re-register.
+      if (_token != null) {
+        await _registerToken(_token!);
+      } else {
+        await _fetchTokenAndRegister(FirebaseMessaging.instance);
+      }
       return;
     }
 
     try {
       await Firebase.initializeApp();
+      debugPrint('AIVA/FCM: Firebase initialized');
     } catch (e) {
-      debugPrint('AIVA: Firebase not configured — push disabled ($e)');
+      debugPrint('AIVA/FCM: Firebase not configured — push disabled ($e)');
       return;
     }
     _initialized = true;
 
     try {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission();
-      _token = await messaging.getToken();
-      if (_token != null) await _registerToken(_token!);
+      final settings = await messaging.requestPermission();
+      debugPrint('AIVA/FCM: notification permission = '
+          '${settings.authorizationStatus}');
+
+      // Token fetch is isolated + retried: SERVICE_NOT_AVAILABLE is a common,
+      // usually-transient FCM error and must NOT abort the listener setup below.
+      await _fetchTokenAndRegister(messaging);
+
       messaging.onTokenRefresh.listen((t) {
+        debugPrint('AIVA/FCM: token refreshed = $t');
         _token = t;
         _registerToken(t);
       });
-      FirebaseMessaging.onMessage.listen(_showForeground);
+
+      FirebaseMessaging.onMessage.listen(_onForeground);
+      FirebaseMessaging.onMessageOpenedApp.listen(_onOpened);
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) _onOpened(initial);
     } catch (e) {
-      debugPrint('AIVA: push setup failed ($e)');
+      debugPrint('AIVA/FCM: push setup failed ($e)');
     }
+  }
+
+  /// Fetch the FCM token with a few retries, then register it. FCM commonly
+  /// throws `SERVICE_NOT_AVAILABLE` transiently (no network to Google's servers,
+  /// Play Services warming up) and succeeds on a later attempt.
+  Future<void> _fetchTokenAndRegister(FirebaseMessaging messaging) async {
+    const attempts = 3;
+    for (var i = 1; i <= attempts; i++) {
+      try {
+        _token = await messaging.getToken();
+        if (_token != null) {
+          debugPrint('AIVA/FCM: device token = $_token');
+          await _registerToken(_token!);
+          return;
+        }
+        debugPrint('AIVA/FCM: getToken() returned null (attempt $i/$attempts)');
+      } catch (e) {
+        debugPrint('AIVA/FCM: getToken() failed (attempt $i/$attempts): $e');
+      }
+      if (i < attempts) {
+        await Future<void>.delayed(Duration(seconds: 2 * i));
+      }
+    }
+    debugPrint('AIVA/FCM: could not obtain a token after $attempts attempts — '
+        'will retry on next login/init. Check device internet + Google Play services.');
   }
 
   Future<void> unregister() async {
@@ -59,17 +117,41 @@ class PushService {
   Future<void> _registerToken(String token) async {
     try {
       await _api.dio.post<dynamic>('/fcm/token', data: {'token': token});
-    } catch (_) {
+      debugPrint('AIVA/FCM: token registered with backend OK');
+    } catch (e) {
       // backend unreachable / not authed yet — will retry on next initAndRegister()
+      debugPrint('AIVA/FCM: token registration FAILED ($e)');
     }
   }
 
-  void _showForeground(RemoteMessage message) {
+  // A push arriving while the app is foregrounded.
+  void _onForeground(RemoteMessage message) {
+    debugPrint('AIVA/FCM: foreground push received '
+        'data=${message.data} notif=${message.notification?.title}');
+    notificationPing.value++; // refresh the in-app bell badge / feed
+    if (_maybeIncomingCall(message)) return;
     final notification = message.notification;
     final title = notification?.title ?? 'AIVA';
     final body = notification?.body ?? '';
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(content: Text(body.isEmpty ? title : '$title: $body')),
-    );
+    AppToast.infoGlobal(body.isEmpty ? title : '$title: $body');
+  }
+
+  // The user tapped the notification (app was backgrounded/terminated).
+  void _onOpened(RemoteMessage message) {
+    notificationPing.value++;
+    if (_maybeIncomingCall(message)) return;
+    // Non-call notifications route to their target screen (reminders, mail, etc.).
+    routeNotification(message.data);
+  }
+
+  /// If this is an 'incoming_call' push, raise the native ringing UI (CallKit
+  /// rings + vibrates and shows a full-screen call; accepting it routes into the
+  /// in-app CallScreen via CallKitService). Returns true when handled so the
+  /// caller skips the default SnackBar.
+  bool _maybeIncomingCall(RemoteMessage message) {
+    final data = message.data;
+    if (data['type'] != 'incoming_call') return false;
+    showIncomingCall(data);
+    return true;
   }
 }

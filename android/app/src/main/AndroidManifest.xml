@@ -3,6 +3,11 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Show reminder / important-mail push notifications (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- In-app voice call (WebRTC) for appointment booking. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <!-- Native full-screen incoming-call UI (CallKit) that rings over the lock screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <application
         android:label="aiva"
         android:name="${applicationName}"
@@ -28,6 +33,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Deep link: the Gmail OAuth web callback bounces the browser back into
+                 the app via aiva://mail-connected so the flow doesn't dead-end on the web. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="aiva" android:host="mail-connected"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

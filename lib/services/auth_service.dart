@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../models/user.dart';
 import 'api_client.dart';
@@ -59,6 +60,23 @@ class AuthService {
   Future<User> me() async {
     final res = await _dio.get<Map<String, dynamic>>('/auth/me');
     return User.fromJson(res.data!);
+  }
+
+  /// Detect the device's IANA timezone (e.g. "Asia/Kolkata") and report it to the
+  /// backend so reminders + appointment times are interpreted in the user's local zone.
+  Future<void> reportTimezone() async {
+    String tz;
+    try {
+      tz = await FlutterTimezone.getLocalTimezone(); // IANA name, e.g. "Asia/Kolkata"
+    } catch (_) {
+      return; // can't detect → backend keeps its UTC default
+    }
+    if (tz.isEmpty) return;
+    try {
+      await _dio.put<dynamic>('/auth/timezone', data: {'timezone': tz});
+    } catch (_) {
+      // best effort; retried on the next login
+    }
   }
 
   Future<void> logout() => _tokenStorage.clear();

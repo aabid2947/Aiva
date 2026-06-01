@@ -10,4 +10,12 @@ class AppConfig {
     'AIVA_API_BASE_URL',
     defaultValue: 'https://aiva-backend-woad.vercel.app',
   );
+
+  /// Base URL of the VoiceStream proxy-caller server (the in-app WebRTC call
+  /// for appointment booking). This is a SEPARATE service from the API.
+  /// Override with `--dart-define=AIVA_VOICESTREAM_BASE_URL=...`.
+  static const String voiceStreamBaseUrl = String.fromEnvironment(
+    'AIVA_VOICESTREAM_BASE_URL',
+    defaultValue: 'https://callbot.duckdns.org',
+  );
 }
