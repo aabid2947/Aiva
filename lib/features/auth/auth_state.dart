@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/user.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/push_service.dart';
 
@@ -13,7 +14,10 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 class AuthState extends ChangeNotifier {
   AuthState({AuthService? authService, PushService? pushService})
       : _auth = authService ?? AuthService(),
-        _push = pushService ?? PushService();
+        _push = pushService ?? PushService() {
+    // Any token-bearing 401 (expired/revoked session) forces us back to login.
+    ApiClient.onUnauthorized = handleUnauthorized;
+  }
 
   final AuthService _auth;
   final PushService _push;
@@ -70,6 +74,22 @@ class AuthState extends ChangeNotifier {
     _user = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
+  }
+
+  /// Called by [ApiClient] when a token-bearing request gets a 401 (expired or
+  /// revoked session). Clears the session and returns to the login screen.
+  /// Idempotent: re-entrant 401s from other in-flight requests are ignored, and
+  /// it stays out of the way of [bootstrap]'s own startup validation (which runs
+  /// while status is still `unknown`).
+  void handleUnauthorized() {
+    if (_status != AuthStatus.authenticated) return;
+    _status = AuthStatus.unauthenticated;
+    _user = null;
+    _error = 'Your session expired. Please sign in again.';
+    notifyListeners();
+    // Local token clear only — skip the network push-unregister, which would
+    // 401 too; the token is being dropped anyway.
+    unawaited(_auth.logout());
   }
 
   /// Fire-and-forget once the user is authenticated: register for push and

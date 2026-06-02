@@ -24,10 +24,26 @@ class ApiClient {
               }
               handler.next(options);
             },
+            onError: (error, handler) {
+              // A 401 on a request that DID carry our token means the session
+              // expired or was revoked (the JWT lives ~60 min and there's no
+              // refresh). Failed logins send no token, so they never trip this.
+              final sentToken =
+                  error.requestOptions.headers.containsKey('Authorization');
+              if (error.response?.statusCode == 401 && sentToken) {
+                onUnauthorized?.call();
+              }
+              handler.next(error);
+            },
           ),
         );
   }
 
   final Dio dio;
   final TokenStorage _tokenStorage;
+
+  /// Invoked once when any token-bearing request fails with 401 (an expired or
+  /// revoked session). [AuthState] registers this to clear the session and drop
+  /// to the login screen. Static so every per-service ApiClient shares one hook.
+  static void Function()? onUnauthorized;
 }
