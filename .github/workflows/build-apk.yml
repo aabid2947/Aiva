@@ -1,0 +1,54 @@
+name: Build APK
+
+# Builds the release APK on GitHub's runners so a slow laptop doesn't have to.
+# Trigger it manually from the Actions tab (Run workflow), or it runs on every
+# push to main. Download the APK from the run's "Artifacts" section.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "android/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".github/workflows/build-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable      # satisfies pubspec Dart sdk ^3.11.5; pin flutter-version: 3.41.9 to match dev exactly
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      # Per-ABI release APKs — smaller + faster than a fat APK. arm64-v8a is the
+      # one for the POCO M2 Pro (and most modern phones).
+      - name: Build release APK (split per ABI)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: aiva-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
