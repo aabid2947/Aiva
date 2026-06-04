@@ -3,20 +3,28 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_keys.dart';
+import '../core/motion/page_transitions.dart';
 import '../core/widgets/app_toast.dart';
+import '../features/appointments/call_screen.dart';
 import '../features/notifications/notification_routing.dart';
 import 'api_client.dart';
 import 'call_kit_service.dart';
 
-/// Top-level FCM background handler. Non-call notifications carry a notification
-/// payload, so the OS shows them in the tray while backgrounded/terminated.
-/// `incoming_call` pushes arrive DATA-ONLY + high priority so this handler runs
-/// even when the app is killed/locked and can raise the native full-screen
-/// ringing UI via CallKit. FCM requires a registered background handler.
+/// Top-level FCM background handler, run in its own isolate. `incoming_call`
+/// pushes now carry a NOTIFICATION payload, so the OS renders the ringing
+/// heads-up itself (reliable even when the app is killed, and on OEMs like MIUI
+/// that won't wake an app for a data-only push) — the user taps it to answer.
+/// This handler is only reached for a DATA-ONLY call push (best-effort native
+/// ring where the device delivers it); it must init Firebase in this isolate and
+/// is fully guarded so a failure here never crashes the isolate.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  if (message.data['type'] == 'incoming_call') {
+  if (message.data['type'] != 'incoming_call') return;
+  try {
+    await Firebase.initializeApp();
     await showIncomingCall(message.data);
+  } catch (_) {
+    // The OS notification is the primary path; ignore isolate-side failures.
   }
 }
 
@@ -144,14 +152,34 @@ class PushService {
     routeNotification(message.data);
   }
 
-  /// If this is an 'incoming_call' push, raise the native ringing UI (CallKit
-  /// rings + vibrates and shows a full-screen call; accepting it routes into the
-  /// in-app CallScreen via CallKitService). Returns true when handled so the
-  /// caller skips the default SnackBar.
+  /// If this is an 'incoming_call' push, open the in-app call screen directly
+  /// (its 'incoming' phase rings with Accept/Decline, then WebRTC-connects on
+  /// accept). We route straight to CallScreen rather than depending on the
+  /// native CallKit UI, which doesn't reliably fire on every device. Returns
+  /// true when handled so the caller skips the default toast/route.
   bool _maybeIncomingCall(RemoteMessage message) {
     final data = message.data;
     if (data['type'] != 'incoming_call') return false;
-    showIncomingCall(data);
+    _openCallScreen(data);
     return true;
+  }
+
+  void _openCallScreen(Map<String, dynamic> data) {
+    final id = int.tryParse('${data['booking_request_id'] ?? ''}');
+    if (id == null) return;
+    final target = '${data['target'] ?? ''}'.trim();
+    final caller = '${data['caller_name'] ?? ''}'.trim();
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(
+      fadeThroughRoute<void>(
+        (_) => CallScreen(
+          bookingRequestId: id,
+          target: target.isEmpty ? 'the appointment' : target,
+          callerName: caller.isEmpty ? null : caller,
+          autoConnect: false, // show the in-app incoming UI; user taps Accept
+        ),
+      ),
+    );
   }
 }
