@@ -8,24 +8,18 @@ import '../core/widgets/app_toast.dart';
 import '../features/appointments/call_screen.dart';
 import '../features/notifications/notification_routing.dart';
 import 'api_client.dart';
-import 'call_kit_service.dart';
 
-/// Top-level FCM background handler, run in its own isolate. `incoming_call`
-/// pushes now carry a NOTIFICATION payload, so the OS renders the ringing
-/// heads-up itself (reliable even when the app is killed, and on OEMs like MIUI
-/// that won't wake an app for a data-only push) — the user taps it to answer.
-/// This handler is only reached for a DATA-ONLY call push (best-effort native
-/// ring where the device delivers it); it must init Firebase in this isolate and
-/// is fully guarded so a failure here never crashes the isolate.
+/// Top-level FCM background handler, run in its own isolate.
+///
+/// Intentionally a no-op: every push (calls included) now carries a NOTIFICATION
+/// payload, so the OS renders + sounds it while the app is backgrounded/terminated
+/// and the tap routes in via onMessageOpenedApp / getInitialMessage. We deliberately
+/// do NOT raise the native CallKit ring here — the OS notification (high-importance
+/// `incoming_calls` channel, see MainActivity) is the SINGLE ring. Raising CallKit
+/// too made the phone play two overlapping ringtones at once.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  if (message.data['type'] != 'incoming_call') return;
-  try {
-    await Firebase.initializeApp();
-    await showIncomingCall(message.data);
-  } catch (_) {
-    // The OS notification is the primary path; ignore isolate-side failures.
-  }
+  // No background work needed; the OS handles notification display + sound.
 }
 
 /// Firebase Cloud Messaging integration.
