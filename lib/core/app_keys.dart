@@ -10,3 +10,11 @@ final navigatorKey = GlobalKey<NavigatorState>();
 /// Bumped by the push handler whenever a notification arrives, so the
 /// notification bell badge / feed can refresh without a global state object.
 final notificationPing = ValueNotifier<int>(0);
+
+/// Set with an 'incoming_call' FCM data payload when the app is COLD-STARTED by
+/// tapping a call notification (detected in main() before the UI builds). The auth
+/// gate shows the CallScreen directly when this is set, so the user lands on the
+/// pick-up screen instead of flashing through splash -> home -> call. Cleared when
+/// the call ends. (Warm taps, where sub-routes may be open, push the CallScreen on
+/// top instead — see PushService.)
+final incomingCall = ValueNotifier<Map<String, dynamic>?>(null);

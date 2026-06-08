@@ -20,6 +20,7 @@ class CallScreen extends StatefulWidget {
     required this.target,
     this.callerName,
     this.autoConnect = false,
+    this.onEnd,
   });
 
   final int bookingRequestId;
@@ -29,6 +30,12 @@ class CallScreen extends StatefulWidget {
   /// When true the call was already accepted on the native CallKit UI, so we
   /// skip the in-app "incoming" phase and connect straight away.
   final bool autoConnect;
+
+  /// How to dismiss when the call ends. When the screen was ROUTED to (cold-start
+  /// via the auth gate) there's nothing to pop, so the host passes a callback to
+  /// clear the pending-call state. When the screen was PUSHED (warm tap), this is
+  /// null and we Navigator.pop() instead.
+  final VoidCallback? onEnd;
 
   @override
   State<CallScreen> createState() => _CallScreenState();
@@ -93,13 +100,23 @@ class _CallScreenState extends State<CallScreen>
     _timer?.cancel();
     await _call.dispose();
     await _clearNativeCall();
-    if (mounted) Navigator.of(context).maybePop();
+    _dismiss();
   }
 
   Future<void> _decline() async {
     HapticFeedback.mediumImpact();
     await _clearNativeCall();
-    if (mounted) Navigator.of(context).maybePop();
+    _dismiss();
+  }
+
+  /// Leave the call screen. Routed (cold-start) screens clear the pending-call
+  /// state via [onEnd]; pushed (warm) screens just pop.
+  void _dismiss() {
+    if (widget.onEnd != null) {
+      widget.onEnd!();
+    } else if (mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   /// Clear any lingering CallKit ongoing-call notification for this booking.

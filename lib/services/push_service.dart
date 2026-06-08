@@ -74,8 +74,10 @@ class PushService {
 
       FirebaseMessaging.onMessage.listen(_onForeground);
       FirebaseMessaging.onMessageOpenedApp.listen(_onOpened);
-      final initial = await messaging.getInitialMessage();
-      if (initial != null) _onOpened(initial);
+      // NOTE: the cold-start launch message (getInitialMessage) is read once in
+      // main() (_preloadInitialCall) — for a call it routes straight to the pick-up
+      // screen with no home flash; for other notifications it deep-links on first
+      // frame. Reading it here too would double-handle / consume it.
     } catch (e) {
       debugPrint('AIVA/FCM: push setup failed ($e)');
     }
