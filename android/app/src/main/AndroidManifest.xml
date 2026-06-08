@@ -52,6 +52,13 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/aiva_notification" />
+        <!-- Default FCM channel for notifications that don't name one (reminders,
+             mail, appointment outcomes). Created at IMPORTANCE_HIGH in MainActivity,
+             and the backend sets AndroidNotification.channel_id to the same id — so
+             pushes reliably render as a heads-up instead of a silent fallback. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="aiva_alerts" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

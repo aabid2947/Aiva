@@ -85,8 +85,13 @@ class PushService {
   /// throws `SERVICE_NOT_AVAILABLE` transiently (no network to Google's servers,
   /// Play Services warming up) and succeeds on a later attempt.
   Future<void> _fetchTokenAndRegister(FirebaseMessaging messaging) async {
-    const attempts = 3;
-    for (var i = 1; i <= attempts; i++) {
+    // Warm-up: getToken() right at cold start frequently throws
+    // SERVICE_NOT_AVAILABLE because Google Play services / the FCM socket aren't
+    // ready yet. A short pause first, then retry with exponential backoff, makes
+    // token acquisition reliable across network types and cold starts.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    const attempts = 5;
+    for (var i = 0; i < attempts; i++) {
       try {
         _token = await messaging.getToken();
         if (_token != null) {
@@ -94,12 +99,13 @@ class PushService {
           await _registerToken(_token!);
           return;
         }
-        debugPrint('AIVA/FCM: getToken() returned null (attempt $i/$attempts)');
+        debugPrint('AIVA/FCM: getToken() returned null (attempt ${i + 1}/$attempts)');
       } catch (e) {
-        debugPrint('AIVA/FCM: getToken() failed (attempt $i/$attempts): $e');
+        debugPrint('AIVA/FCM: getToken() failed (attempt ${i + 1}/$attempts): $e');
       }
-      if (i < attempts) {
-        await Future<void>.delayed(Duration(seconds: 2 * i));
+      if (i < attempts - 1) {
+        final secs = (2 << i).clamp(2, 16); // 2s, 4s, 8s, 16s
+        await Future<void>.delayed(Duration(seconds: secs));
       }
     }
     debugPrint('AIVA/FCM: could not obtain a token after $attempts attempts — '
@@ -117,13 +123,20 @@ class PushService {
   }
 
   Future<void> _registerToken(String token) async {
-    try {
-      await _api.dio.post<dynamic>('/fcm/token', data: {'token': token});
-      debugPrint('AIVA/FCM: token registered with backend OK');
-    } catch (e) {
-      // backend unreachable / not authed yet — will retry on next initAndRegister()
-      debugPrint('AIVA/FCM: token registration FAILED ($e)');
+    // Retry the backend save: a token is useless until the server has it, and the
+    // POST can transiently fail (network blip, auth header not attached yet right
+    // after login). A few backoff attempts make registration stick.
+    for (var i = 0; i < 3; i++) {
+      try {
+        await _api.dio.post<dynamic>('/fcm/token', data: {'token': token});
+        debugPrint('AIVA/FCM: token registered with backend OK');
+        return;
+      } catch (e) {
+        debugPrint('AIVA/FCM: token registration failed (attempt ${i + 1}/3): $e');
+        if (i < 2) await Future<void>.delayed(Duration(seconds: 2 * (i + 1)));
+      }
     }
+    // Still failed — a later initAndRegister() (next login/app open) will retry.
   }
 
   // A push arriving while the app is foregrounded.
