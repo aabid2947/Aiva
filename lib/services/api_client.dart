@@ -5,13 +5,17 @@ import 'token_storage.dart';
 
 /// Wraps a Dio instance and attaches the JWT to every request via an interceptor.
 class ApiClient {
-  ApiClient({Dio? dio, TokenStorage? tokenStorage})
-      : dio = dio ??
+  ApiClient({
+    Dio? dio,
+    TokenStorage? tokenStorage,
+    String? baseUrl,
+    Duration? receiveTimeout,
+  })  : dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: AppConfig.apiBaseUrl,
+                baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
                 connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 30),
+                receiveTimeout: receiveTimeout ?? const Duration(seconds: 30),
               ),
             ),
         _tokenStorage = tokenStorage ?? TokenStorage() {

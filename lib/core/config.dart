@@ -18,4 +18,16 @@ class AppConfig {
     'AIVA_VOICESTREAM_BASE_URL',
     defaultValue: 'https://callbot.duckdns.org',
   );
+
+  /// Base URL for file summarization uploads (`POST /summarize/upload`).
+  ///
+  /// This route is hosted on the always-on worker box, NOT on Vercel: Vercel's
+  /// serverless body cap (~4.5 MB) and execution-time limit (~10-60 s) break
+  /// large-file / long-document summaries ("can't reach server"). The worker
+  /// host has neither limit. Everything else still uses [apiBaseUrl].
+  /// Override with `--dart-define=AIVA_SUMMARIZE_BASE_URL=...`.
+  static const String summarizeBaseUrl = String.fromEnvironment(
+    'AIVA_SUMMARIZE_BASE_URL',
+    defaultValue: 'https://callbot.duckdns.org',
+  );
 }

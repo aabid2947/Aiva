@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_keys.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/util/time_format.dart';
@@ -37,17 +38,29 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // A 'summary_ready' notification tap requests opening a specific chat.
+    openChatRequest.addListener(_onOpenChatRequest);
+    // Handle a request already pending from a cold start (set before we attached).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onOpenChatRequest());
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
+    openChatRequest.removeListener(_onOpenChatRequest);
     _scrollController.dispose();
     _controller.dispose();
     _focusNode.dispose();
     _drawerOpenTick.dispose();
     _voice.dispose();
     super.dispose();
+  }
+
+  void _onOpenChatRequest() {
+    final chatId = openChatRequest.value;
+    if (chatId == null || !mounted) return;
+    openChatRequest.value = null; // consume it
+    context.read<ChatState>().openChatById(chatId);
   }
 
   void _onScroll() {

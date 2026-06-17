@@ -49,6 +49,25 @@ class ChatState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Open a chat by id when only the id is known (e.g. tapping a 'summary_ready'
+  /// notification). Uses the loaded list entry if present (for its title); refreshes
+  /// once if missing, then falls back to a minimal chat so messages still load.
+  Future<void> openChatById(String chatId) async {
+    Chat? chat = _findChat(chatId);
+    if (chat == null) {
+      await _refreshChatsQuietly();
+      chat = _findChat(chatId);
+    }
+    await openChat(chat ?? Chat(id: chatId));
+  }
+
+  Chat? _findChat(String id) {
+    for (final c in _chats) {
+      if (c.id == id) return c;
+    }
+    return null;
+  }
+
   Future<void> openChat(Chat chat) async {
     _currentChat = chat;
     _messages = [];

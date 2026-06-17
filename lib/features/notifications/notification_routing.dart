@@ -26,6 +26,14 @@ void routeNotification(Map<String, dynamic> data) {
     case 'appointment_outcome':
     case 'incoming_call':
       nav.push(sharedAxisRoute<void>((_) => const AppointmentsScreen()));
+    case 'summary_ready':
+      // The summary lives in a chat — drop any open sub-routes so the chat home is
+      // visible, then ask it to open the specific chat (the chat screen listens).
+      final chatId = data['chat_id'] as String?;
+      if (chatId != null && chatId.isNotEmpty) {
+        nav.popUntil((r) => r.isFirst);
+        openChatRequest.value = chatId;
+      }
     default:
       break;
   }

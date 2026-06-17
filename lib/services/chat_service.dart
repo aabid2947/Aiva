@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../core/config.dart';
 import '../models/chat.dart';
 import '../models/message.dart';
 import 'api_client.dart';
@@ -18,9 +19,19 @@ class SendMessageResult {
 
 /// Talks to the backend /chats endpoints (token attached by ApiClient).
 class ChatService {
-  ChatService({ApiClient? api}) : _api = api ?? ApiClient();
+  ChatService({ApiClient? api, ApiClient? uploadApi})
+      : _api = api ?? ApiClient(),
+        _uploadApi = uploadApi ??
+            ApiClient(
+              // Summarization is hosted on the always-on worker box (not Vercel)
+              // so large files / long docs aren't capped. It can run for a while,
+              // so allow a much longer receive timeout than the default 30s.
+              baseUrl: AppConfig.summarizeBaseUrl,
+              receiveTimeout: const Duration(minutes: 5),
+            );
 
   final ApiClient _api;
+  final ApiClient _uploadApi;
   Dio get _dio => _api.dio;
 
   Future<List<Chat>> listChats() async {
@@ -63,7 +74,7 @@ class ChatService {
       'file': MultipartFile.fromBytes(bytes, filename: filename),
     };
     if (chatId != null) fields['chat_id'] = chatId;
-    final res = await _dio.post<Map<String, dynamic>>(
+    final res = await _uploadApi.dio.post<Map<String, dynamic>>(
       '/summarize/upload',
       data: FormData.fromMap(fields),
     );

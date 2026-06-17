@@ -11,6 +11,12 @@ final navigatorKey = GlobalKey<NavigatorState>();
 /// notification bell badge / feed can refresh without a global state object.
 final notificationPing = ValueNotifier<int>(0);
 
+/// Set with a chat id when a notification should open a specific chat (e.g. tapping
+/// a 'summary_ready' push). The chat screen listens and opens that chat, then clears
+/// it. Lives here so non-widget code (the push handler / notification routing) can
+/// request it without a global state object.
+final openChatRequest = ValueNotifier<String?>(null);
+
 /// Set with an 'incoming_call' FCM data payload when the app is COLD-STARTED by
 /// tapping a call notification (detected in main() before the UI builds). The auth
 /// gate shows the CallScreen directly when this is set, so the user lands on the

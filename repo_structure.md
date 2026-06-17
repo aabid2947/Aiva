@@ -31,8 +31,8 @@ app/
 └── lib/
     ├── main.dart                ✅ AivaApp (MultiProvider AuthState+ThemeController → MaterialApp light/dark via themeMode, edge-to-edge) + _AuthGate (AnimatedSwitcher cross-fade → BrandedSplash/Login/authed); authed = MultiProvider(ChatState, MailConnectState) + _AuthedHome (app_links deep-link listener for aiva://mail-connected)
     ├── core/
-    │   ├── config.dart          ✅ AppConfig.apiBaseUrl + voiceStreamBaseUrl (dart-define overrides)
-    │   ├── app_keys.dart        ✅ Global scaffoldMessengerKey + navigatorKey + notificationPing (ValueNotifier bumped on each push → bell badge refresh)
+    │   ├── config.dart          ✅ AppConfig.apiBaseUrl + voiceStreamBaseUrl + summarizeBaseUrl (file uploads hit the worker host, not Vercel) (dart-define overrides)
+    │   ├── app_keys.dart        ✅ Global scaffoldMessengerKey + navigatorKey + notificationPing (bell badge) + openChatRequest (summary_ready → open chat) + incomingCall
     │   ├── theme/               ✅ Centralized design system (UI revamp Prompt 1) — screens MUST read from here, never hardcode
     │   │   ├── app_colors.dart       ✅ AppColors (brand+semantic+neutral palette) + light/dark ColorSchemes + AppPalette ThemeExtension + context.palette
     │   │   ├── app_typography.dart   ✅ AppTypography.textTheme(scheme) — Plus Jakarta Sans headings + Inter body (google_fonts)
@@ -64,9 +64,9 @@ app/
     │   └── app_notification.dart ✅ AppNotification model (id, type, title, body, data map, read, createdAt) — notification feed item
     ├── services/
     │   ├── token_storage.dart   ✅ JWT save/read/clear via flutter_secure_storage
-    │   ├── api_client.dart      ✅ Dio + interceptor that attaches the Bearer token
+    │   ├── api_client.dart      ✅ Dio + interceptor that attaches the Bearer token (baseUrl/receiveTimeout overridable — used for the long-running summarize upload client)
     │   ├── auth_service.dart    ✅ signup/login/forgot/reset/me/logout; reportTimezone (device IANA tz → PUT /auth/timezone)
-    │   ├── chat_service.dart    ✅ list/create chats, get messages, send message, uploadFile (multipart→/summarize/upload)
+    │   ├── chat_service.dart    ✅ list/create chats, get messages, send message, uploadFile (multipart→/summarize/upload on the worker host via a 5-min-timeout client)
     │   ├── push_service.dart    ✅ FCM: token→/fcm/token (3x retry on SERVICE_NOT_AVAILABLE); foreground toast + bell ping; 'incoming_call' (fg + background isolate) → showIncomingCall (native CallKit ring); other taps route via routeNotification (reminder/mail/outcome→screens)
     │   ├── mail_service.dart    ✅ Gmail status/connect-url/update-watch/disconnect (+ MailStatus model)
     │   ├── appointment_service.dart ✅ GET /appointments (list) + PUT /appointments/{id} (edit) + DELETE /appointments/{id} (cancel pending)
@@ -81,13 +81,13 @@ app/
         │   ├── login_screen.dart           ✅ (redesigned P3) gradient backdrop, logo+wordmark, animated login↔signup toggle (name field collapse, label cross-fade), pill button, password reveal, keyboard-safe
         │   └── forgot_password_screen.dart ✅ (redesigned P3) same language; animated form↔success-card switch
         ├── chat/
-        │   ├── chat_state.dart             ✅ ChangeNotifier: chats/currentChat/messages, optimistic send + attachAndSummarize
+        │   ├── chat_state.dart             ✅ ChangeNotifier: chats/currentChat/messages, optimistic send + attachAndSummarize, openChatById (open by id from a notification)
         │   ├── chat_drawer.dart            ✅ (P5) ChatDrawer — branded account header, searchable chat history, grouped footer (Notifications/Reminders/Mail/Appointments/Logout), staggered entrance on open
         │   └── chat_screen.dart            ✅ (redesigned P4) asymmetric bubbles + AIVA avatar, fade/slide message entrance, animated 3-dot typing, suggestion-chip empty state, jump-to-latest, rounded composer, animated dismissible Gmail banner, hairline app bar (wordmark) with NotificationBell; inline "Connect Gmail" button under assistant mail-intent messages while unconnected
         ├── notifications/
         │   ├── notifications_screen.dart   ✅ Notification center — feed of all pushes (newest first), unread dot, tap→mark-read+route, mark-all-read, pull-to-refresh, skeleton/empty
         │   ├── notification_bell.dart      ✅ NotificationBell — app-bar icon + unread Badge; refreshes on mount / notificationPing / after viewing the feed
-        │   └── notification_routing.dart   ✅ routeNotification(data) — maps a notification's data payload → target screen (reminder→Reminders, mail→Mail highlight, outcome/call→Appointments); shared by push handler + feed
+        │   └── notification_routing.dart   ✅ routeNotification(data) — maps a notification's data payload → target screen (reminder→Reminders, mail→Mail highlight, outcome/call→Appointments, summary_ready→open the chat); shared by push handler + feed
         ├── reminders/
         │   ├── reminders_screen.dart       ✅ Lists all reminders (pending-first), StatusChip + local due time + relative, Edit + cancel pending, skeleton/empty, pull-to-refresh
         │   └── reminder_edit_screen.dart   ✅ Edit a pending reminder: content + date/time picker (sends UTC); backend rejects past times
