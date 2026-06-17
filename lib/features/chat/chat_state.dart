@@ -204,6 +204,11 @@ class ChatState extends ChangeNotifier {
       return 'Cannot reach the server. Check your connection and try again.';
     }
     final status = e.response?.statusCode;
+    if (status == 413) {
+      // Either nginx (HTML body) or the API (JSON detail) rejected an oversized
+      // upload — give a clear message instead of the generic fallback.
+      return 'That file is too large to summarize. Please upload a file under 50 MB.';
+    }
     if (status != null && status >= 500) {
       return 'Something went wrong on our end. Please try again in a moment.';
     }
